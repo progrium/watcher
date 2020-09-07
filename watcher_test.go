@@ -138,6 +138,43 @@ func TestFileInfo(t *testing.T) {
 	}
 }
 
+func TestRenameWatchedSubdir(t *testing.T) {
+	testDir, teardown := setup(t)
+	defer teardown()
+
+	w := New()
+
+	if err := w.Add(testDir); err != nil {
+		t.Fatal(err)
+	}
+
+	subdir := filepath.Join(testDir, "testDirTwo")
+	if err := w.Add(subdir); err != nil {
+		t.Fatal(err)
+	}
+
+	go func() {
+		// Start the watching process.
+		if err := w.Start(time.Millisecond); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	os.Rename(subdir, filepath.Join(testDir, "testDirTwoNew"))
+
+	// go func() {
+	// 	for err := range w.Error {
+	// 		fmt.Println(err)
+	// 	}
+	// }()
+
+	<-w.Event // WRITE event to dir
+	rename := <-w.Event
+	if rename.Op != Rename {
+		t.Error("expected event for rename")
+	}
+}
+
 func TestWatcherAdd(t *testing.T) {
 	testDir, teardown := setup(t)
 	defer teardown()

@@ -506,10 +506,14 @@ func (w *Watcher) retrieveFileList() map[string]os.FileInfo {
 			if err != nil {
 				if os.IsNotExist(err) {
 					w.mu.Unlock()
-					if name == err.(*os.PathError).Path {
-						w.Error <- ErrWatchedFileDeleted
-						w.Remove(name)
-					}
+					// if name is a file being watch from another
+					// watched name, we dont want to remove it.
+					// TODO: figure out how to do this correctly.
+
+					// if name == err.(*os.PathError).Path {
+					// 	w.Error <- ErrWatchedFileDeleted
+					// 	w.Remove(name)
+					// }
 					w.mu.Lock()
 				} else {
 					w.Error <- err
@@ -659,6 +663,16 @@ func (w *Watcher) pollEvents(files map[string]os.FileInfo, evt chan Event,
 				if filepath.Dir(path1) == filepath.Dir(path2) {
 					e.Op = Rename
 				}
+
+				newNames := map[string]bool{}
+				for path, recursive := range w.names {
+					if strings.HasPrefix(path+"/", path1+"/") {
+						newNames[strings.Replace(path, path1, path2, 1)] = recursive
+					} else {
+						newNames[path] = recursive
+					}
+				}
+				w.names = newNames
 
 				delete(removes, path1)
 				delete(creates, path2)
